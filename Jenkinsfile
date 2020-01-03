@@ -35,9 +35,11 @@ pipeline {
                          Commit_Id = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
                          BuildVersion = Current_version + '_' + Commit_Id
                          println("BuildVersion: $BuildVersion")
-                         last_digit_current_version = sh(script: "echo $Current_version | cut -d'.' -f3", returnStdout: true).trim()
+                         last_digit_current_version = sh(script: "echo $Current_version | cut -d'.' -f1", returnStdout: true).trim()
+                         println("Current last_digit_current_version: $last_digit_current_version")
                          NextVersion = sh(script: "echo $Current_version | cut -d. -f1", returnStdout: true).trim() + '.' + sh(script: "echo $Current_version |cut -d'.' -f2", returnStdout: true).trim() + '.' + (Integer.parseInt(last_digit_current_version) + 1)
-                         println("Checking the build version: $BuildVersion")
+                         println("Current the build version: $BuildVersion")
+                         println("Next build version: $NextVersion")
                      }
                  }
              }
@@ -86,10 +88,22 @@ pipeline {
                  }
              }
          }
-         stage('Push tag version to repository'){
+         stage('Push tag version to repository and update Release.json file'){
              steps{
                  script{
-                    println('Tag version will be added soon')
+                     node('master'){
+                         dir('Release') {
+                             withCredentials([usernamePassword(credentialsId: 'INT_WEB', passwordVariable: 'GIT_PASS', usernameVariable: 'GIT_USER')]) {
+                                 sh "git checkout gadi"
+                                 sh "sed -i 's/${Current_version}/${BuildVersion}/' release.json"
+                                 sh "git config --global user.email 'gadi@gadi.com'"
+                                 sh "git config --global user.name 'Jenkins'"
+                                 sh "git add ${path_json_file}"
+                                 sh "git commit -m 'CI approved ${NextVersion}'"
+                                 sh "git push https://${GIT_USER}:${GIT_PASS}@github.com/gadigamburg/Release.git"
+                             }
+                         }
+                     }
                  }
              }
          }
